@@ -1,537 +1,712 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#e8edf3">
+<title>Ana – AI Sekretarica</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg:#e8edf3;--tx:#2a3a4a;--tx2:#2a3a4a55;--ac:#00c8b4;--dark:#b8c5d0;--light:#ffffff;--r:16px}
+body{background:var(--bg);color:var(--tx);font-family:'Segoe UI',Arial,sans-serif;min-height:100vh;transition:background .3s,color .3s;overflow-x:hidden}
+.c{background:var(--bg);box-shadow:6px 6px 14px var(--dark),-6px -6px 14px var(--light);border-radius:var(--r)}
+.i{background:var(--bg);box-shadow:inset 4px 4px 10px var(--dark),inset -4px -4px 10px var(--light);border-radius:12px}
+.b{background:var(--bg);box-shadow:4px 4px 10px var(--dark),-4px -4px 10px var(--light);border-radius:50px;border:none;cursor:pointer;color:var(--tx);font-family:inherit;transition:all .2s;outline:none}
+.b:active{box-shadow:inset 3px 3px 8px var(--dark),inset -3px -3px 8px var(--light)}
+input,textarea,select{background:var(--bg);box-shadow:inset 4px 4px 10px var(--dark),inset -4px -4px 10px var(--light);border-radius:12px;border:none;color:var(--tx);font-family:inherit;outline:none;width:100%;padding:10px 14px;font-size:13px}
+input[type=time],input[type=date]{color-scheme:light dark}
+#app{max-width:480px;margin:0 auto;padding:0 0 20px}
 
-const COLORS = ["#00c8b4","#6ab4ff","#ffb347","#ff7eb3","#b47eff"];
+/* HEADER */
+.hdr{padding:14px 14px 0;display:flex;justify-content:space-between;align-items:flex-start}
+.clk{font-size:28px;font-weight:900;letter-spacing:-1px;color:var(--tx)}
+.dbar{padding:4px 14px 8px;font-size:12px;font-weight:700;color:var(--ac)}
 
-const SYSTEM = `Ti si Ana, ljubazna i pametna AI sekretarica koja govori srpski jezik. 
-Ti pomažeš korisniku da organizuje svoj dan. 
-Imaš pristup sledećim podacima korisnika koji ti se prosleđuju u svakoj poruci.
-Kada korisnik kaže da doda alarm, belešku, termin ili zadatak – odgovori potvrdom i vrati JSON komandu.
+/* TABS */
+.tabs{display:inline-flex;gap:2px;padding:5px 6px}
+.tb{padding:7px 11px;font-size:12px;font-weight:700;border-radius:50px;border:none;cursor:pointer;font-family:inherit;background:transparent;box-shadow:none;color:var(--tx2);transition:all .2s}
+.tb.on{background:var(--bg);box-shadow:4px 4px 10px var(--dark),-4px -4px 10px var(--light);color:var(--ac)}
 
-Format komandi (vrati kao deo odgovora):
-- Za alarm: [CMD:ADD_ALARM:{"label":"naziv","time":"HH:MM","rep":"none"}]
-- Za belešku: [CMD:ADD_NOTE:{"title":"naziv","items":["stavka1","stavka2"]}]
-- Za termin: [CMD:ADD_EVENT:{"title":"naziv","time":"HH:MM","date":"","loc":""}]
-- Za zadatak: [CMD:ADD_TODO:{"text":"tekst"}]
-- Za brisanje alarma po imenu: [CMD:DEL_ALARM:{"label":"naziv"}]
-- Za brisanje zadatka: [CMD:DEL_TODO:{"text":"tekst"}]
+/* ANA CARD */
+.ana-card{margin:10px 12px;padding:14px;display:flex;align-items:center;gap:12px}
+.ana-av{width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,var(--ac),#00a896);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;box-shadow:0 4px 14px #00c8b444}
+.ana-av.talking{animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+@keyframes si{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes dot{0%,100%{height:4px}50%{height:16px}}
+@keyframes pr{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.8);opacity:0}}
 
-Budi topla, prirodna i kratka u odgovorima. Govori kao prijatelj, ne kao robot.
-Uvek odgovaraj na srpskom jeziku.`;
+/* CHAT */
+.chat-box{margin:0 12px 10px;padding:12px;min-height:220px;max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg-row{display:flex;animation:si .2s ease}
+.msg-row.u{justify-content:flex-end}
+.msg-row.a{justify-content:flex-start;align-items:flex-end;gap:6px}
+.av-sm{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--ac),#00a896);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.bubble{max-width:78%;padding:9px 13px;border-radius:18px;font-size:13px;line-height:1.5;word-break:break-word}
+.bubble.u{background:linear-gradient(135deg,var(--ac),#00a896);color:#fff;border-radius:18px 18px 4px 18px;box-shadow:0 4px 12px #00c8b444}
+.bubble.a{background:var(--bg);box-shadow:4px 4px 10px var(--dark),-4px -4px 10px var(--light);border-radius:18px 18px 18px 4px}
+.dots-wrap{display:flex;gap:5px;padding:10px 14px;align-items:center}
+.dot-ani{width:7px;height:7px;border-radius:50%;background:var(--ac);animation:dot .7s ease infinite alternate}
+.dot-ani:nth-child(2){animation-delay:.2s}.dot-ani:nth-child(3){animation-delay:.4s}
 
-export default function App() {
-  const [notes, setNotes] = useState([
-    {id:1,title:"Shopping lista",items:["Hleb","Mleko","Jaja"]},
-    {id:2,title:"Ideje",items:["Plan A","Plan B"]},
-  ]);
-  const [alarms, setAlarms] = useState([
-    {id:1,label:"Jutarnji",time:"07:00",active:true,fired:false,rep:"none"},
-    {id:2,label:"Trening",time:"18:30",active:true,fired:false,rep:"none"},
-  ]);
-  const [events, setEvents] = useState([
-    {id:1,title:"Sastanak",time:"14:00",date:"",color:"#00c8b4",loc:""},
-    {id:2,title:"Paket",time:"15:30",date:"",color:"#6ab4ff",loc:""},
-  ]);
-  const [todos, setTodos] = useState([
-    {id:1,text:"Zavrsi izvestaj",done:false},
-    {id:2,text:"Kupi mleko",done:false},
-  ]);
-  const [msgs, setMsgs] = useState([
-    {r:"a", t:"Zdravo! Ja sam Ana, tvoja AI sekretarica. Mogu da vodim tvoje beleske, alarme, termine i zadatke. Kako mogu da ti pomognem danas?"}
-  ]);
-  const [input, setInput] = useState("");
-  const [thinking, setThinking] = useState(false);
-  const [tab, setTab] = useState("chat");
-  const [time, setTime] = useState(new Date());
-  const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const [theme, setTheme] = useState("light");
-  const [showSettings, setShowSettings] = useState(false);
+/* INPUT BAR */
+.inp-bar{margin:0 12px 10px;padding:9px;display:flex;gap:8px;align-items:center}
+.mic-wrap{position:relative;flex-shrink:0}
+.mic-ring{position:absolute;inset:-5px;border-radius:50%;border:2px solid var(--ac);animation:pr 1s ease-out infinite;display:none}
+.mic-btn{width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s;background:var(--bg);box-shadow:4px 4px 10px var(--dark),-4px -4px 10px var(--light)}
+.mic-btn.on{background:linear-gradient(135deg,var(--ac),#00a896)!important;box-shadow:0 0 20px #00c8b488!important}
+.send-btn{width:46px;height:46px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:var(--bg);box-shadow:4px 4px 10px var(--dark),-4px -4px 10px var(--light);flex-shrink:0}
 
-  const chatEndRef = useRef(null);
-  const recRef = useRef(null);
-  const apiMsgsRef = useRef([]);
+/* EXAMPLES */
+.ex-wrap{display:flex;gap:6px;flex-wrap:wrap;margin:0 12px 12px}
+.ex-btn{padding:7px 11px;font-size:10px;font-weight:700;color:var(--ac)}
 
-  // Clock
-  useEffect(() => {
-    const t = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
+/* QUICK GRID */
+.qgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 12px 10px}
+.q-sec{padding:12px 11px}
+.q-title{font-size:11px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:5px}
+.q-item{padding:7px 9px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;gap:6px}
 
-  // Alarm engine
-  useEffect(() => {
-    const t = setInterval(() => {
-      const n = new Date();
-      setAlarms(prev => prev.map(a => {
-        if (!a.active || a.fired) return a;
-        const [h,m] = a.time.split(":").map(Number);
-        if (n.getHours()===h && n.getMinutes()===m && n.getSeconds()<5) {
-          speak(`${a.label}! Vreme je!`);
-          return {...a, fired:true};
-        }
-        return a;
-      }));
-    }, 2000);
-    return () => clearInterval(t);
-  }, []);
+/* SECTION */
+.sec{margin:0 12px 10px;padding:14px}
+.sec-title{font-size:13px;font-weight:800;margin-bottom:10px;color:var(--ac);display:flex;align-items:center;gap:6px}
 
-  // Scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({behavior:"smooth"});
-  }, [msgs, thinking]);
+/* TOGGLE */
+.tgl{width:42px;height:24px;border-radius:12px;position:relative;cursor:pointer;flex-shrink:0;transition:background .3s}
+.tgl-k{position:absolute;top:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .3s;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 
-  const themes = {
-    light: {bg:"#e8edf3", tx:"#2a3a4a", dark:"#b8c5d0", light:"#ffffff", ac:"#00c8b4"},
-    dark:  {bg:"#1a2030", tx:"#e0eaf5", dark:"#0d1118", light:"#252f42", ac:"#00c8b4"},
-    blue:  {bg:"#dce8f5", tx:"#1a3050", dark:"#a8c0d8", light:"#f0f8ff", ac:"#2288cc"},
-  };
-  const th = themes[theme] || themes.light;
+/* BADGE */
+.bdg{min-width:20px;height:20px;border-radius:10px;padding:0 5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#fff;background:#e94444;flex-shrink:0}
 
-  const neu = {
-    card: `linear-gradient(145deg, ${th.bg}, ${th.bg})`,
-    shadow: `6px 6px 14px ${th.dark}, -6px -6px 14px ${th.light}`,
-    inset: `inset 4px 4px 10px ${th.dark}, inset -4px -4px 10px ${th.light}`,
-    btnSh: `4px 4px 10px ${th.dark}, -4px -4px 10px ${th.light}`,
-  };
+/* TAG */
+.tag{padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;color:#fff}
 
-  const card = {background:th.bg, boxShadow:neu.shadow, borderRadius:18, border:`1px solid ${th.light}33`};
-  const inset = {background:th.bg, boxShadow:neu.inset, borderRadius:12};
-  const btn = {background:th.bg, boxShadow:neu.btnSh, borderRadius:50, border:"none", cursor:"pointer", color:th.tx, fontFamily:"inherit"};
+/* TLINE */
+.tline{padding:6px 9px;margin-bottom:4px;border-radius:0 10px 10px 0;border-left:3px solid var(--ac)}
 
-  // Speak
-  const speak = useCallback((text) => {
-    if (!window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "sr-RS"; u.rate = 0.92; u.pitch = 1.1;
-    const voices = window.speechSynthesis.getVoices();
-    const v = voices.find(x => x.lang.startsWith("sr") || x.lang.startsWith("hr") || x.lang.startsWith("bs"));
-    if (v) u.voice = v;
-    u.onstart = () => setSpeaking(true);
-    u.onend = () => setSpeaking(false);
-    window.speechSynthesis.speak(u);
-  }, []);
+/* OFFLINE */
+#offbadge{position:fixed;top:6px;right:8px;background:#ff6644;color:#fff;font-size:10px;font-weight:800;padding:4px 10px;border-radius:20px;z-index:999;display:none}
 
-  // Parse commands from AI response
-  const parseCommands = useCallback((text) => {
-    const cmdRe = /\[CMD:(\w+):(\{.*?\})\]/g;
-    let match;
-    let clean = text;
-    while ((match = cmdRe.exec(text)) !== null) {
-      const cmd = match[1];
-      let data;
-      try { data = JSON.parse(match[2]); } catch { continue; }
-      clean = clean.replace(match[0], "");
-      if (cmd === "ADD_ALARM") {
-        setAlarms(prev => [...prev, {id:Date.now(), label:data.label||"Alarm", time:data.time||"08:00", active:true, fired:false, rep:data.rep||"none"}]);
-      } else if (cmd === "ADD_NOTE") {
-        setNotes(prev => [...prev, {id:Date.now(), title:data.title||"Beleska", items:data.items||[]}]);
-      } else if (cmd === "ADD_EVENT") {
-        setEvents(prev => [...prev, {id:Date.now(), title:data.title||"Termin", time:data.time||"12:00", date:data.date||"", color:COLORS[Math.floor(Math.random()*COLORS.length)], loc:data.loc||""}]);
-      } else if (cmd === "ADD_TODO") {
-        setTodos(prev => [...prev, {id:Date.now(), text:data.text||"Zadatak", done:false}]);
-      } else if (cmd === "DEL_ALARM") {
-        setAlarms(prev => prev.filter(a => a.label !== data.label));
-      } else if (cmd === "DEL_TODO") {
-        setTodos(prev => prev.filter(t => t.text !== data.text));
-      }
-    }
-    return clean.trim();
-  }, []);
+/* THEME BTNS */
+.th-btn{flex:1;padding:9px 4px;font-size:11px;font-weight:700}
+</style>
+</head>
+<body>
+<div id="offbadge">OFFLINE</div>
+<div id="app">
 
-  // Send to AI
-  const sendMsg = useCallback(async (text) => {
-    if (!text.trim()) return;
-    setInput("");
-    setMsgs(prev => [...prev, {r:"u", t:text}]);
-    setThinking(true);
+  <!-- HEADER -->
+  <div class="hdr">
+    <div>
+      <div class="c tabs" id="tabbar">
+        <button class="tb on" data-t="chat">Ana</button>
+        <button class="tb" data-t="notes">Beleske</button>
+        <button class="tb" data-t="alarmi">Alarmi</button>
+        <button class="tb" data-t="termini">Termini</button>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div class="clk" id="clk">00:00</div>
+      <div style="font-size:11px;color:var(--tx2);font-weight:600" id="uname-lbl">Sasa</div>
+    </div>
+  </div>
+  <div class="dbar" id="dbar"></div>
 
-    // Build context for AI
-    const ctx = `
-TRENUTNI PODACI KORISNIKA:
-Alarmi: ${alarms.map(a=>`${a.label} u ${a.time}`).join(", ") || "nema"}
-Beleske: ${notes.map(n=>n.title).join(", ") || "nema"}
-Termini danas: ${events.map(e=>`${e.title} u ${e.time}`).join(", ") || "nema"}
-Zadaci: ${todos.filter(t=>!t.done).map(t=>t.text).join(", ") || "nema"}
-Vreme: ${time.toLocaleTimeString("sr-RS")}
-Datum: ${time.toLocaleDateString("sr-RS", {weekday:"long", day:"numeric", month:"long"})}
-`;
+  <!-- CHAT TAB -->
+  <div id="t-chat">
 
-    const newMsg = {role:"user", content: ctx + "\n\nKorisnik kaže: " + text};
-    const updatedMsgs = [...apiMsgsRef.current, newMsg];
-    apiMsgsRef.current = updatedMsgs;
+    <!-- ANA PROFIL -->
+    <div class="c ana-card" id="ana-card">
+      <div class="ana-av" id="ana-av">&#x1F469;&#x200D;&#x1F4BC;</div>
+      <div style="flex:1">
+        <div style="font-size:17px;font-weight:900">Ana</div>
+        <div style="font-size:11px;color:var(--ac);font-weight:700" id="ana-status">&#x25CF; Dostupna</div>
+        <div style="font-size:10px;color:var(--tx2);margin-top:2px">AI Sekretarica &bull; Besplatno</div>
+      </div>
+      <button class="b" onclick="toggleSettings()" style="width:36px;height:36px;display:flex;align-items:center;justify-content:center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--tx)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
 
-    const timeout = setTimeout(() => {
-      setThinking(false);
-      const er = "Veza je spora, pokušaj ponovo.";
-      setMsgs(prev => [...prev, {r:"a", t:er}]);
-      speak(er);
-    }, 20000);
-
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 600,
-          system: SYSTEM,
-          messages: updatedMsgs.slice(-12),
-        })
-      });
-      clearTimeout(timeout);
-      const data = await res.json();
-      const raw = data.content?.[0]?.text || "Nisam razumela. Možeš ponoviti?";
-      const clean = parseCommands(raw);
-      apiMsgsRef.current = [...updatedMsgs, {role:"assistant", content:clean}];
-      setThinking(false);
-      setMsgs(prev => [...prev, {r:"a", t:clean}]);
-      speak(clean);
-    } catch(e) {
-      clearTimeout(timeout);
-      setThinking(false);
-      const er = "Greška u komunikaciji. Provjeri internet.";
-      setMsgs(prev => [...prev, {r:"a", t:er}]);
-      speak(er);
-    }
-  }, [alarms, notes, events, todos, time, speak, parseCommands]);
-
-  // Mic
-  const toggleMic = useCallback(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { alert("Koristite Chrome za prepoznavanje govora."); return; }
-    if (listening) {
-      recRef.current?.stop();
-      setListening(false);
-      return;
-    }
-    const rec = new SR();
-    rec.lang = "sr-RS"; rec.interimResults = false;
-    rec.onstart = () => setListening(true);
-    rec.onresult = e => {
-      const t = e.results[0][0].transcript;
-      sendMsg(t);
-    };
-    rec.onerror = () => setListening(false);
-    rec.onend = () => setListening(false);
-    recRef.current = rec;
-    rec.start();
-  }, [listening, sendMsg]);
-
-  const fmt = d => String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
-  const fmtDate = d => d.toLocaleDateString("sr-RS",{weekday:"long",day:"numeric",month:"long"});
-
-  // SVG icons
-  const Mic = ({size=22, color=th.ac}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>;
-  const Send = ({size=20}) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={th.ac} strokeWidth="2.5" strokeLinecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
-  const NoteIco = ({c=th.ac}) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>;
-  const BellIco = ({c=th.ac}) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>;
-  const CalIco = ({c=th.ac}) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
-  const CheckIco = ({c="#fff"}) => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>;
-  const TrashIco = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6666" strokeWidth="2.5" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>;
-  const GearIco = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={th.tx} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
-
-  const tabs = [
-    {id:"chat", label:"Ana"},
-    {id:"notes", label:"Beleske"},
-    {id:"alarmi", label:"Alarmi"},
-    {id:"termini", label:"Termini"},
-  ];
-
-  return (
-    <div style={{background:th.bg, minHeight:"100vh", color:th.tx, fontFamily:"'Segoe UI',Arial,sans-serif", maxWidth:480, margin:"0 auto", paddingBottom:120}}>
-
-      {/* HEADER */}
-      <div style={{padding:"16px 16px 0", display:"flex", justifyContent:"space-between", alignItems:"flex-start"}}>
-        <div style={{...card, display:"inline-flex", gap:2, padding:"5px 7px"}}>
-          {tabs.map(t => (
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{
-              ...btn,
-              padding:"7px 12px", fontSize:12, fontWeight:700,
-              color: tab===t.id ? th.ac : th.tx+"88",
-              boxShadow: tab===t.id ? neu.btnSh : "none",
-              background: tab===t.id ? th.bg : "transparent",
-            }}>{t.label}</button>
-          ))}
+    <!-- SETTINGS -->
+    <div id="settings-box" style="display:none;margin:0 12px 10px">
+      <div class="c" style="padding:14px">
+        <div style="font-size:13px;font-weight:800;margin-bottom:10px;color:var(--ac)">Tema</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="b th-btn" onclick="setTheme('light')">Svetla</button>
+          <button class="b th-btn" onclick="setTheme('dark')">Tamna</button>
+          <button class="b th-btn" onclick="setTheme('blue')">Plava</button>
         </div>
-        <div style={{textAlign:"right"}}>
-          <div style={{fontSize:28, fontWeight:900, letterSpacing:-1}}>{fmt(time)}</div>
-          <div style={{fontSize:11, color:th.tx+"77", fontWeight:600}}>Sasa</div>
+        <div style="font-size:13px;font-weight:800;margin-bottom:10px;color:var(--ac)">Boja akcenta</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div onclick="setAC('#00c8b4')" style="width:28px;height:28px;border-radius:50%;background:#00c8b4;cursor:pointer;box-shadow:2px 2px 6px rgba(0,0,0,.2)"></div>
+          <div onclick="setAC('#6ab4ff')" style="width:28px;height:28px;border-radius:50%;background:#6ab4ff;cursor:pointer;box-shadow:2px 2px 6px rgba(0,0,0,.2)"></div>
+          <div onclick="setAC('#ffb347')" style="width:28px;height:28px;border-radius:50%;background:#ffb347;cursor:pointer;box-shadow:2px 2px 6px rgba(0,0,0,.2)"></div>
+          <div onclick="setAC('#ff7eb3')" style="width:28px;height:28px;border-radius:50%;background:#ff7eb3;cursor:pointer;box-shadow:2px 2px 6px rgba(0,0,0,.2)"></div>
+          <div onclick="setAC('#b47eff')" style="width:28px;height:28px;border-radius:50%;background:#b47eff;cursor:pointer;box-shadow:2px 2px 6px rgba(0,0,0,.2)"></div>
         </div>
       </div>
-      <div style={{padding:"5px 16px 0", fontSize:12, fontWeight:700, color:th.ac, textTransform:"capitalize"}}>{fmtDate(time)}</div>
-
-      {/* ═══ CHAT TAB ═══ */}
-      {tab==="chat" && (
-        <div style={{display:"flex", flexDirection:"column", padding:"12px 12px 0"}}>
-
-          {/* ANA PROFIL */}
-          <div style={{...card, padding:"14px 16px", marginBottom:12, display:"flex", alignItems:"center", gap:12}}>
-            <div style={{
-              width:52, height:52, borderRadius:"50%",
-              background:`linear-gradient(135deg, ${th.ac}, #00a896)`,
-              display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:24, boxShadow:`0 4px 14px ${th.ac}55`, flexShrink:0,
-              animation: speaking ? "pulse 1s ease-in-out infinite" : "none",
-            }}>
-              <span role="img" aria-label="ana">👩‍💼</span>
-            </div>
-            <div>
-              <div style={{fontSize:16, fontWeight:900}}>Ana</div>
-              <div style={{fontSize:11, color:th.ac, fontWeight:700}}>
-                {speaking ? "🔊 Govori..." : listening ? "🎤 Slusa..." : thinking ? "💭 Razmišlja..." : "● Dostupna"}
-              </div>
-              <div style={{fontSize:10, color:th.tx+"66", marginTop:2}}>AI Sekretarica · Besplatno</div>
-            </div>
-            <button onClick={()=>setShowSettings(!showSettings)} style={{...btn, width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", marginLeft:"auto"}}>
-              <GearIco/>
-            </button>
-          </div>
-
-          {/* SETTINGS */}
-          {showSettings && (
-            <div style={{...card, padding:14, marginBottom:12}}>
-              <div style={{fontSize:13, fontWeight:800, marginBottom:10, color:th.ac}}>Tema</div>
-              <div style={{display:"flex", gap:8}}>
-                {["light","dark","blue"].map(t => (
-                  <button key={t} onClick={()=>setTheme(t)} style={{
-                    ...btn, flex:1, padding:"9px 6px", fontSize:11, fontWeight:700,
-                    color: theme===t ? th.ac : th.tx+"88",
-                    boxShadow: theme===t ? `inset 3px 3px 8px ${th.dark},inset -3px -3px 8px ${th.light}` : neu.btnSh,
-                  }}>{t==="light"?"Svetla":t==="dark"?"Tamna":"Plava"}</button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* BRZI PREGLED */}
-          <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:12}}>
-            <div style={{...card, padding:12}}>
-              <div style={{fontSize:11, fontWeight:800, marginBottom:8, display:"flex", alignItems:"center", gap:5}}><BellIco/>Alarmi</div>
-              {alarms.filter(a=>a.active).slice(0,2).map(a => (
-                <div key={a.id} style={{...inset, padding:"6px 9px", marginBottom:5, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                  <div>
-                    <div style={{fontSize:11, fontWeight:700}}>{a.label}</div>
-                    <div style={{fontSize:10, color:th.tx+"77"}}>{a.time}</div>
-                  </div>
-                  <div style={{width:18, height:18, borderRadius:"50%", background:a.fired?"#aaa":"#ff4444", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:900, color:"#fff"}}>{a.fired?"✓":"!"}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{...card, padding:12}}>
-              <div style={{fontSize:11, fontWeight:800, marginBottom:8, display:"flex", alignItems:"center", gap:5}}><CalIco/>Termini</div>
-              {events.slice(0,2).map(e => (
-                <div key={e.id} style={{...inset, padding:"6px 9px", marginBottom:5, borderLeft:`3px solid ${e.color}`, borderRadius:"0 8px 8px 0"}}>
-                  <div style={{fontSize:10, fontWeight:800, color:e.color}}>{e.time}</div>
-                  <div style={{fontSize:11, fontWeight:600}}>{e.title}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* CHAT PORUKE */}
-          <div style={{...card, padding:12, marginBottom:12, minHeight:200, maxHeight:340, overflowY:"auto", display:"flex", flexDirection:"column", gap:8}}>
-            {msgs.map((m,i) => (
-              <div key={i} style={{display:"flex", justifyContent:m.r==="u"?"flex-end":"flex-start"}}>
-                {m.r==="a" && (
-                  <div style={{width:28, height:28, borderRadius:"50%", background:`linear-gradient(135deg,${th.ac},#00a896)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, marginRight:6, flexShrink:0, alignSelf:"flex-end"}}>
-                    👩‍💼
-                  </div>
-                )}
-                <div style={{
-                  maxWidth:"75%", padding:"9px 13px", borderRadius:m.r==="u"?"18px 18px 4px 18px":"18px 18px 18px 4px",
-                  background: m.r==="u" ? `linear-gradient(135deg,${th.ac},#00a896)` : th.bg,
-                  boxShadow: m.r==="u" ? `0 4px 12px ${th.ac}44` : neu.shadow,
-                  color: m.r==="u" ? "#fff" : th.tx,
-                  fontSize:13, lineHeight:1.5, animation:"slideIn .2s ease",
-                }}>{m.t}</div>
-              </div>
-            ))}
-            {thinking && (
-              <div style={{display:"flex", alignItems:"center", gap:8}}>
-                <div style={{width:28, height:28, borderRadius:"50%", background:`linear-gradient(135deg,${th.ac},#00a896)`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14}}>👩‍💼</div>
-                <div style={{...inset, padding:"10px 14px", display:"flex", gap:5}}>
-                  {[0,1,2].map(i => <div key={i} style={{width:7, height:7, borderRadius:"50%", background:th.ac, animation:`dot .8s ease ${i*.2}s infinite alternate`}}/>)}
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef}/>
-          </div>
-
-          {/* INPUT */}
-          <div style={{...card, padding:10, display:"flex", gap:8, alignItems:"center"}}>
-            <div style={{position:"relative", flexShrink:0}}>
-              {listening && <div style={{position:"absolute", inset:-6, borderRadius:"50%", border:`2px solid ${th.ac}`, animation:"pulse 1s ease infinite", opacity:.6}}/>}
-              <button onClick={toggleMic} style={{
-                width:46, height:46, borderRadius:"50%", border:"none", cursor:"pointer",
-                background: listening ? `linear-gradient(135deg,${th.ac},#00a896)` : th.bg,
-                boxShadow: listening ? `0 0 20px ${th.ac}88` : neu.btnSh,
-                display:"flex", alignItems:"center", justifyContent:"center",
-                transition:"all .3s",
-              }}>
-                <Mic color={listening?"#fff":th.ac}/>
-              </button>
-            </div>
-            <input
-              value={input}
-              onChange={e=>setInput(e.target.value)}
-              onKeyDown={e=>{if(e.key==="Enter"&&input.trim())sendMsg(input);}}
-              placeholder="Pitaj Anu nešto..."
-              style={{...inset, flex:1, padding:"11px 14px", fontSize:13, color:th.tx, outline:"none", border:"none"}}
-            />
-            <button onClick={()=>sendMsg(input)} style={{...btn, width:46, height:46, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}}>
-              <Send/>
-            </button>
-          </div>
-
-          {/* PRIMERI */}
-          <div style={{display:"flex", gap:6, marginTop:10, flexWrap:"wrap"}}>
-            {["Dodaj alarm za 8:00","Šta imam danas?","Dodaj zadatak","Koji su moji termini?"].map(ex => (
-              <button key={ex} onClick={()=>sendMsg(ex)} style={{
-                ...btn, padding:"7px 12px", fontSize:10, fontWeight:700, color:th.ac,
-              }}>{ex}</button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ═══ BELESKE TAB ═══ */}
-      {tab==="notes" && (
-        <div style={{padding:"12px 12px 0"}}>
-          <div style={{...card, padding:14, marginBottom:12}}>
-            <div style={{fontSize:13, fontWeight:800, marginBottom:10, color:th.ac, display:"flex", alignItems:"center", gap:6}}><NoteIco c={th.ac}/>Nova Beleska</div>
-            <input id="nt" placeholder="Naziv..." style={{...inset, marginBottom:8, color:th.tx, outline:"none", border:"none"}}/>
-            <textarea id="ni" placeholder="Stavke (svaka u novom redu)..." rows={3} style={{...inset, display:"block", width:"100%", padding:"10px 14px", fontSize:12, resize:"none", marginBottom:8, color:th.tx, outline:"none", border:"none"}}/>
-            <button onClick={()=>{
-              const t=document.getElementById("nt").value.trim();
-              const its=document.getElementById("ni").value.split("\n").filter(Boolean);
-              if(!t)return;
-              setNotes(prev=>[...prev,{id:Date.now(),title:t,items:its}]);
-              document.getElementById("nt").value="";
-              document.getElementById("ni").value="";
-            }} style={{...btn, width:"100%", padding:11, fontSize:13, fontWeight:700, color:th.ac}}>Sacuvaj</button>
-          </div>
-          {notes.map(n => (
-            <div key={n.id} style={{...card, padding:14, marginBottom:10}}>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
-                <div style={{display:"flex", alignItems:"center", gap:8}}><NoteIco c={th.ac}/><span style={{fontSize:14, fontWeight:800}}>{n.title}</span></div>
-                <button onClick={()=>setNotes(p=>p.filter(x=>x.id!==n.id))} style={{...btn, padding:"5px 10px"}}><TrashIco/></button>
-              </div>
-              <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
-                {n.items.map((it,i) => <span key={i} style={{...inset, padding:"4px 10px", fontSize:11, fontWeight:600}}>{it}</span>)}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ═══ ALARMI TAB ═══ */}
-      {tab==="alarmi" && (
-        <div style={{padding:"12px 12px 0"}}>
-          <div style={{...card, padding:14, marginBottom:12}}>
-            <div style={{fontSize:13, fontWeight:800, marginBottom:10, color:th.ac, display:"flex", alignItems:"center", gap:6}}><BellIco c={th.ac}/>Novi Alarm</div>
-            <input id="al" placeholder="Naziv..." style={{...inset, marginBottom:8, color:th.tx, outline:"none", border:"none"}}/>
-            <input type="time" id="at" style={{...inset, marginBottom:8, color:th.tx, outline:"none", border:"none"}}/>
-            <select id="arep" style={{...inset, marginBottom:10, color:th.tx, outline:"none", border:"none"}}>
-              <option value="none">Jednom</option>
-              <option value="daily">Svaki dan</option>
-              <option value="weekdays">Radni dani</option>
-              <option value="weekend">Vikend</option>
-            </select>
-            <button onClick={()=>{
-              const l=document.getElementById("al").value.trim();
-              const t=document.getElementById("at").value;
-              const rep=document.getElementById("arep").value;
-              if(!l||!t)return;
-              setAlarms(prev=>[...prev,{id:Date.now(),label:l,time:t,active:true,fired:false,rep}]);
-              document.getElementById("al").value="";
-              document.getElementById("at").value="";
-            }} style={{...btn, width:"100%", padding:11, fontSize:13, fontWeight:700, color:th.ac}}>Postavi Alarm</button>
-          </div>
-          {alarms.map(a => (
-            <div key={a.id} style={{...card, padding:"12px 14px", marginBottom:8, display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-              <div style={{display:"flex", alignItems:"center", gap:10}}>
-                <BellIco c={a.active?th.ac:"#aaa"}/>
-                <div>
-                  <div style={{fontSize:14, fontWeight:800}}>{a.label}</div>
-                  <div style={{fontSize:12, color:th.ac, fontWeight:700}}>{a.time} · {a.rep}</div>
-                  {a.fired&&a.rep==="none"&&<div style={{fontSize:10, color:"#aaa"}}>Oglasio se ✓</div>}
-                </div>
-              </div>
-              <div style={{display:"flex", gap:8, alignItems:"center"}}>
-                <div onClick={()=>setAlarms(p=>p.map(x=>x.id===a.id?{...x,active:!x.active,fired:false}:x))}
-                  style={{width:42, height:24, borderRadius:12, background:a.active?`linear-gradient(90deg,${th.ac},#00a896)`:"#ccc", position:"relative", cursor:"pointer", transition:"all .3s"}}>
-                  <div style={{position:"absolute", top:3, left:a.active?21:3, width:18, height:18, borderRadius:"50%", background:"#fff", transition:"left .3s", boxShadow:"0 1px 4px rgba(0,0,0,.2)"}}/>
-                </div>
-                <button onClick={()=>setAlarms(p=>p.filter(x=>x.id!==a.id))} style={{...btn, padding:"5px 10px"}}><TrashIco/></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ═══ TERMINI TAB ═══ */}
-      {tab==="termini" && (
-        <div style={{padding:"12px 12px 0"}}>
-          <div style={{...card, padding:14, marginBottom:12}}>
-            <div style={{fontSize:13, fontWeight:800, marginBottom:10, color:th.ac, display:"flex", alignItems:"center", gap:6}}><CalIco c={th.ac}/>Novi Termin</div>
-            <input id="et" placeholder="Naziv termina..." style={{...inset, marginBottom:8, color:th.tx, outline:"none", border:"none"}}/>
-            <input type="date" id="ed" style={{...inset, marginBottom:8, color:th.tx, outline:"none", border:"none"}}/>
-            <input type="time" id="etm" style={{...inset, marginBottom:8, color:th.tx, outline:"none", border:"none"}}/>
-            <input id="eloc" placeholder="Lokacija (opciono)..." style={{...inset, marginBottom:8, color:th.tx, outline:"none", border:"none"}}/>
-            <button onClick={()=>{
-              const t=document.getElementById("et").value.trim();
-              const tm=document.getElementById("etm").value;
-              const d=document.getElementById("ed").value;
-              const loc=document.getElementById("eloc").value.trim();
-              if(!t||!tm)return;
-              setEvents(prev=>[...prev,{id:Date.now(),title:t,time:tm,date:d,color:COLORS[Math.floor(Math.random()*COLORS.length)],loc}]);
-              document.getElementById("et").value="";
-              document.getElementById("etm").value="";
-              document.getElementById("ed").value="";
-              document.getElementById("eloc").value="";
-            }} style={{...btn, width:"100%", padding:11, fontSize:13, fontWeight:700, color:th.ac}}>Dodaj Termin</button>
-          </div>
-          {[...events].sort((a,b)=>a.time.localeCompare(b.time)).map(e => (
-            <div key={e.id} style={{...card, padding:"12px 14px", marginBottom:8, borderLeft:`4px solid ${e.color}`}}>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
-                <div>
-                  <div style={{display:"flex", alignItems:"center", gap:6}}><CalIco c={e.color}/><span style={{fontSize:14, fontWeight:800}}>{e.title}</span></div>
-                  <div style={{fontSize:12, color:e.color, fontWeight:700, marginTop:2}}>{e.time}{e.date?" · "+e.date:""}</div>
-                  {e.loc&&<div style={{fontSize:10, color:th.tx+"77", marginTop:2}}>📍 {e.loc}</div>}
-                </div>
-                <button onClick={()=>setEvents(p=>p.filter(x=>x.id!==e.id))} style={{...btn, padding:"5px 10px"}}><TrashIco/></button>
-              </div>
-            </div>
-          ))}
-
-          {/* TO-DO u termini tabu */}
-          <div style={{...card, padding:14, marginTop:4}}>
-            <div style={{fontSize:13, fontWeight:800, marginBottom:10, color:th.ac}}>✅ To-Do Lista</div>
-            {todos.map(t => (
-              <div key={t.id} onClick={()=>setTodos(p=>p.map(x=>x.id===t.id?{...x,done:!x.done}:x))}
-                style={{...inset, padding:"8px 10px", marginBottom:6, display:"flex", alignItems:"center", gap:8, cursor:"pointer"}}>
-                <div style={{width:18, height:18, borderRadius:"50%", border:`2px solid ${t.done?th.ac:"#bbb"}`, background:t.done?th.ac:"transparent", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, transition:"all .2s"}}>
-                  {t.done&&<CheckIco/>}
-                </div>
-                <span style={{fontSize:12, fontWeight:600, textDecoration:t.done?"line-through":"none", opacity:t.done?.4:1}}>{t.text}</span>
-                <button onClick={e=>{e.stopPropagation();setTodos(p=>p.filter(x=>x.id!==t.id));}} style={{...btn, padding:"3px 7px", marginLeft:"auto"}}><TrashIco/></button>
-              </div>
-            ))}
-            <div style={{display:"flex", gap:6, marginTop:8}}>
-              <input id="tdi" placeholder="Novi zadatak..." style={{...inset, flex:1, fontSize:12, padding:"8px 10px", color:th.tx, outline:"none", border:"none"}}
-                onKeyDown={e=>{if(e.key==="Enter"){const v=document.getElementById("tdi").value.trim();if(v){setTodos(p=>[...p,{id:Date.now(),text:v,done:false}]);document.getElementById("tdi").value=""}}}}/>
-              <button onClick={()=>{const v=document.getElementById("tdi").value.trim();if(v){setTodos(p=>[...p,{id:Date.now(),text:v,done:false}]);document.getElementById("tdi").value="";}}} style={{...btn, padding:"8px 12px", fontSize:18, color:th.ac, fontWeight:900}}>+</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes slideIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
-        @keyframes dot { from{height:4px} to{height:18px} }
-        input, textarea, select { user-select:text!important; -webkit-user-select:text!important; }
-      `}</style>
     </div>
-  );
+
+    <!-- BRZI PREGLED -->
+    <div class="qgrid">
+      <div class="c q-sec">
+        <div class="q-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          Alarmi
+        </div>
+        <div id="qalarms"></div>
+      </div>
+      <div class="c q-sec">
+        <div class="q-title">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Termini
+        </div>
+        <div id="qevents"></div>
+      </div>
+    </div>
+
+    <!-- CHAT PORUKE -->
+    <div class="c chat-box" id="chat-box"></div>
+
+    <!-- INPUT -->
+    <div class="c inp-bar">
+      <div class="mic-wrap">
+        <div class="mic-ring" id="mic-ring"></div>
+        <button class="mic-btn" id="mic-btn" onclick="togMic()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2" stroke-linecap="round" id="mic-ico"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+      </div>
+      <input id="chat-inp" placeholder="Pitaj Anu nesto..." onkeydown="if(event.key==='Enter'){sendMsg(this.value);this.value=''}" style="font-size:13px">
+      <button class="send-btn" onclick="var v=document.getElementById('chat-inp').value;if(v.trim()){sendMsg(v);document.getElementById('chat-inp').value=''}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+
+    <!-- PRIMERI -->
+    <div class="ex-wrap">
+      <button class="b ex-btn" onclick="sendMsg('Sta imam danas?')">Sta imam danas?</button>
+      <button class="b ex-btn" onclick="sendMsg('Dodaj alarm za 8:00')">Dodaj alarm 8:00</button>
+      <button class="b ex-btn" onclick="sendMsg('Moji zadaci')">Moji zadaci</button>
+      <button class="b ex-btn" onclick="sendMsg('Dodaj zadatak kupi hleb')">Novi zadatak</button>
+    </div>
+  </div>
+
+  <!-- BELESKE TAB -->
+  <div id="t-notes" style="display:none">
+    <div class="c sec">
+      <div class="sec-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Nova Beleska
+      </div>
+      <input id="nt" placeholder="Naziv beleske..." style="margin-bottom:8px">
+      <textarea id="ni" placeholder="Stavke (svaka u novom redu)..." rows="3" style="padding:10px 14px;font-size:12px;resize:none;margin-bottom:8px;display:block"></textarea>
+      <button class="b" onclick="addNote()" style="width:100%;padding:11px;font-size:13px;font-weight:700;color:var(--ac)">Sacuvaj</button>
+    </div>
+    <div id="notes-list"></div>
+  </div>
+
+  <!-- ALARMI TAB -->
+  <div id="t-alarmi" style="display:none">
+    <div class="c sec">
+      <div class="sec-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M5 3L2 6M22 6l-3-3"/></svg>
+        Novi Alarm
+      </div>
+      <input id="al" placeholder="Naziv alarma..." style="margin-bottom:8px">
+      <input type="time" id="at" style="margin-bottom:8px">
+      <select id="arep" style="margin-bottom:10px;font-size:12px">
+        <option value="none">Jednom</option>
+        <option value="daily">Svaki dan</option>
+        <option value="weekdays">Radni dani</option>
+        <option value="weekend">Vikend</option>
+      </select>
+      <button class="b" onclick="addAlarm()" style="width:100%;padding:11px;font-size:13px;font-weight:700;color:var(--ac)">Postavi Alarm</button>
+    </div>
+    <div id="alarms-list"></div>
+  </div>
+
+  <!-- TERMINI TAB -->
+  <div id="t-termini" style="display:none">
+    <div class="c sec">
+      <div class="sec-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Novi Termin
+      </div>
+      <input id="et" placeholder="Naziv termina..." style="margin-bottom:8px">
+      <input type="date" id="ed" style="margin-bottom:8px">
+      <input type="time" id="etm" style="margin-bottom:8px">
+      <input id="eloc" placeholder="Lokacija (opciono)..." style="margin-bottom:8px">
+      <button class="b" onclick="addEvent()" style="width:100%;padding:11px;font-size:13px;font-weight:700;color:var(--ac)">Dodaj Termin</button>
+    </div>
+    <div id="events-list"></div>
+
+    <!-- TODO -->
+    <div class="c sec">
+      <div class="sec-title">To-Do Lista</div>
+      <div id="todo-list"></div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input id="tdi" placeholder="Novi zadatak..." style="font-size:12px;padding:8px 10px" onkeydown="if(event.key==='Enter')addTodo()">
+        <button class="b" onclick="addTodo()" style="padding:8px 12px;font-size:18px;color:var(--ac);font-weight:900">+</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════
+// DATA
+// ═══════════════════════════════════
+const EVCOL=["#00c8b4","#6ab4ff","#ffb347","#ff7eb3","#b47eff"];
+const SYSTEM=`Ti si Ana, ljubazna i pametna AI sekretarica koja govori srpski jezik prirodno i toplo.
+Ti pomažeš korisniku da organizuje dan. Imaš pristup podacima koji ti se salju.
+Kada korisnik kaze da doda alarm, belešku, termin ili zadatak, vrati JSON komandu u odgovoru.
+Format: [CMD:ADD_ALARM:{"label":"naziv","time":"HH:MM","rep":"none"}]
+Format: [CMD:ADD_NOTE:{"title":"naziv","items":["stavka"]}]
+Format: [CMD:ADD_EVENT:{"title":"naziv","time":"HH:MM","date":"","loc":""}]
+Format: [CMD:ADD_TODO:{"text":"tekst"}]
+Format: [CMD:DEL_ALARM:{"label":"naziv"}]
+Format: [CMD:DEL_TODO:{"text":"tekst"}]
+Budi kratka, topla i prirodna. Govori kao prijatelj, ne robot. Uvek na srpskom.`;
+
+let D={
+  notes:[
+    {id:1,title:"Shopping lista",items:["Hleb","Mleko","Jaja"]},
+    {id:2,title:"Ideje",items:["Plan A","Plan B"]},
+  ],
+  alarms:[
+    {id:1,label:"Jutarnji",time:"07:00",active:true,fired:false,rep:"none"},
+    {id:2,label:"Trening",time:"18:30",active:true,fired:false,rep:"none"},
+  ],
+  events:[
+    {id:1,title:"Sastanak",time:"14:00",date:"",color:"#00c8b4",loc:""},
+    {id:2,title:"Paket",time:"15:30",date:"",color:"#6ab4ff",loc:""},
+  ],
+  todos:[
+    {id:1,text:"Zavrsi izvestaj",done:false},
+    {id:2,text:"Kupi mleko",done:false},
+  ],
+  chat:[
+    {r:"a",t:"Zdravo! Ja sam Ana, tvoja AI sekretarica. Mogu da vodim tvoje beleske, alarme, termine i zadatke. Kako mogu da ti pomognem?"}
+  ],
+  apiMsgs:[],
+  theme:"light",
+  ac:"#00c8b4",
+  uname:"Sasa",
+};
+
+try{const s=localStorage.getItem("ana_d");if(s){const p=JSON.parse(s);D=Object.assign({},D,p);D.apiMsgs=[];}}catch(e){}
+function save(){try{localStorage.setItem("ana_d",JSON.stringify(D));}catch(e){}}
+
+// ═══════════════════════════════════
+// THEME
+// ═══════════════════════════════════
+const THEMES={
+  light:{bg:"#e8edf3",tx:"#2a3a4a",dark:"#b8c5d0",light:"#ffffff"},
+  dark: {bg:"#1a2030",tx:"#e0eaf5",dark:"#0d1118",light:"#252f42"},
+  blue: {bg:"#dce8f5",tx:"#1a3050",dark:"#a8c0d8",light:"#f0f8ff"},
+};
+function setTheme(t){
+  D.theme=t;
+  const th=THEMES[t]||THEMES.light;
+  document.documentElement.style.setProperty("--bg",th.bg);
+  document.documentElement.style.setProperty("--tx",th.tx);
+  document.documentElement.style.setProperty("--tx2",th.tx+"55");
+  document.documentElement.style.setProperty("--dark",th.dark);
+  document.documentElement.style.setProperty("--light",th.light);
+  save();
 }
+function setAC(c){
+  D.ac=c;
+  document.documentElement.style.setProperty("--ac",c);
+  renderAll();save();
+}
+function toggleSettings(){
+  const el=document.getElementById("settings-box");
+  el.style.display=el.style.display==="none"?"block":"none";
+}
+
+// ═══════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════
+function updClk(){
+  const n=new Date();
+  document.getElementById("clk").textContent=String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+  document.getElementById("dbar").textContent=n.toLocaleDateString("sr-RS",{weekday:"long",day:"numeric",month:"long"});
+}
+setInterval(updClk,1000);updClk();
+
+// ═══════════════════════════════════
+// ALARM ENGINE
+// ═══════════════════════════════════
+setInterval(()=>{
+  const n=new Date(),day=n.getDay();
+  D.alarms.forEach(a=>{
+    if(!a.active)return;
+    if(a.rep==="none"&&a.fired)return;
+    if(a.rep==="weekdays"&&(day===0||day===6))return;
+    if(a.rep==="weekend"&&day>0&&day<6)return;
+    const[h,m]=a.time.split(":").map(Number);
+    if(n.getHours()===h&&n.getMinutes()===m&&n.getSeconds()<5){
+      if(a.rep==="none")a.fired=true;
+      spk(a.label+". Vreme je!");
+      renderAll();save();
+    }
+  });
+},2000);
+
+// ═══════════════════════════════════
+// TABS
+// ═══════════════════════════════════
+const TABS=["chat","notes","alarmi","termini"];
+function swTab(t){
+  TABS.forEach(x=>{
+    document.getElementById("t-"+x).style.display=x===t?"block":"none";
+  });
+  document.querySelectorAll(".tb").forEach(b=>{
+    b.classList.toggle("on",b.dataset.t===t);
+    b.style.color=b.classList.contains("on")?D.ac:"";
+  });
+  renderAll();
+}
+document.querySelectorAll(".tb").forEach(b=>b.addEventListener("click",()=>swTab(b.dataset.t)));
+
+// ═══════════════════════════════════
+// RENDER
+// ═══════════════════════════════════
+const TRASH=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff6666" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>`;
+const CHECK=`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+const NOTEICO=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+const BELICO=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`;
+const CALICO=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="COLOR" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
+function ico(t,c){return t.replace(/COLOR/g,c||"var(--ac)");}
+
+function renderAll(){
+  renderQAlarms();renderQEvents();renderNotes();renderAlarms();renderEvents();renderTodos();renderChat();
+}
+
+function renderQAlarms(){
+  const el=document.getElementById("qalarms");if(!el)return;
+  el.innerHTML=D.alarms.filter(a=>a.active).slice(0,2).map(a=>`
+    <div class="i q-item">
+      <div>${ico(BELICO,a.fired&&a.rep==="none"?"#aaa":D.ac)}</div>
+      <div style="flex:1;margin-left:6px">
+        <div style="font-size:11px;font-weight:700">${esc(a.label)}</div>
+        <div style="font-size:10px;color:var(--tx2)">${a.time}</div>
+      </div>
+      <div style="width:16px;height:16px;border-radius:50%;background:${a.fired&&a.rep==="none"?"#aaa":"#ff4444"};display:flex;align-items:center;justify-content:center;font-size:8px;color:#fff;font-weight:900">${a.fired&&a.rep==="none"?"✓":"!"}</div>
+    </div>`).join("");
+}
+
+function renderQEvents(){
+  const el=document.getElementById("qevents");if(!el)return;
+  el.innerHTML=D.events.slice(0,2).map(e=>`
+    <div class="i tline" style="border-left-color:${e.color};padding:6px 8px;margin-bottom:4px">
+      <div style="font-size:10px;font-weight:800;color:${e.color}">${e.time}</div>
+      <div style="font-size:11px;font-weight:600">${esc(e.title)}</div>
+    </div>`).join("");
+}
+
+function renderNotes(){
+  const el=document.getElementById("notes-list");if(!el)return;
+  el.innerHTML=D.notes.map(n=>`
+    <div class="c sec" style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:7px">${ico(NOTEICO,D.ac)}<span style="font-size:14px;font-weight:800">${esc(n.title)}</span></div>
+        <button class="b" onclick="delNote(${n.id})" style="padding:5px 9px">${TRASH}</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px">
+        ${n.items.map(i=>`<span class="i" style="padding:4px 10px;font-size:11px;font-weight:600">${esc(i)}</span>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+function renderAlarms(){
+  const el=document.getElementById("alarms-list");if(!el)return;
+  el.innerHTML=D.alarms.map(a=>`
+    <div class="c" style="padding:12px 14px;margin:0 12px 8px;display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:10px;flex:1">
+        ${ico(BELICO,a.active?D.ac:"#aaa")}
+        <div>
+          <div style="font-size:14px;font-weight:800">${esc(a.label)}</div>
+          <div style="font-size:12px;color:${D.ac};font-weight:700">${a.time} &bull; ${a.rep}</div>
+          ${a.fired&&a.rep==="none"?'<div style="font-size:10px;color:#aaa">Oglasio se</div>':""}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="tgl" style="background:${a.active?"linear-gradient(90deg,"+D.ac+",#00a896)":"#ccc"}" onclick="togAlarm(${a.id})">
+          <div class="tgl-k" style="left:${a.active?"21px":"3px"}"></div>
+        </div>
+        <button class="b" onclick="delAlarm(${a.id})" style="padding:5px 9px">${TRASH}</button>
+      </div>
+    </div>`).join("");
+}
+
+function renderEvents(){
+  const el=document.getElementById("events-list");if(!el)return;
+  el.innerHTML=[...D.events].sort((a,b)=>a.time.localeCompare(b.time)).map(e=>`
+    <div class="c" style="padding:12px 14px;margin:0 12px 8px;border-left:4px solid ${e.color}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="display:flex;align-items:center;gap:6px">${ico(CALICO,e.color)}<span style="font-size:14px;font-weight:800">${esc(e.title)}</span></div>
+          <div style="font-size:12px;color:${e.color};font-weight:700;margin-top:2px">${e.time}${e.date?" &bull; "+e.date:""}</div>
+          ${e.loc?`<div style="font-size:10px;color:var(--tx2);margin-top:2px">&#x1F4CD; ${esc(e.loc)}</div>`:""}
+        </div>
+        <button class="b" onclick="delEvent(${e.id})" style="padding:5px 9px">${TRASH}</button>
+      </div>
+    </div>`).join("");
+}
+
+function renderTodos(){
+  const el=document.getElementById("todo-list");if(!el)return;
+  el.innerHTML=D.todos.map(t=>`
+    <div class="i" onclick="togTodo(${t.id})" style="padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px;cursor:pointer">
+      <div style="width:18px;height:18px;border-radius:50%;border:2px solid ${t.done?D.ac:"#bbb"};background:${t.done?D.ac:"transparent"};display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s">
+        ${t.done?CHECK:""}
+      </div>
+      <span style="font-size:12px;font-weight:600;flex:1;${t.done?"text-decoration:line-through;opacity:.4":""}">${esc(t.text)}</span>
+      <button class="b" onclick="event.stopPropagation();delTodo(${t.id})" style="padding:3px 7px">${TRASH}</button>
+    </div>`).join("");
+}
+
+function renderChat(){
+  const el=document.getElementById("chat-box");if(!el)return;
+  el.innerHTML=D.chat.slice(-30).map(m=>`
+    <div class="msg-row ${m.r}">
+      ${m.r==="a"?'<div class="av-sm">&#x1F469;&#x200D;&#x1F4BC;</div>':""}
+      <div class="bubble ${m.r}">${esc(m.t)}</div>
+    </div>`).join("");
+  el.scrollTop=el.scrollHeight;
+}
+
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+// ═══════════════════════════════════
+// CRUD
+// ═══════════════════════════════════
+function addNote(){
+  const t=document.getElementById("nt").value.trim();
+  const its=document.getElementById("ni").value.split("\n").filter(Boolean);
+  if(!t)return;
+  D.notes.push({id:Date.now(),title:t,items:its});
+  document.getElementById("nt").value="";document.getElementById("ni").value="";
+  renderAll();save();
+}
+function delNote(id){D.notes=D.notes.filter(n=>n.id!==id);renderAll();save();}
+
+function addAlarm(){
+  const l=document.getElementById("al").value.trim(),t=document.getElementById("at").value,rep=document.getElementById("arep").value;
+  if(!l||!t)return;
+  D.alarms.push({id:Date.now(),label:l,time:t,active:true,fired:false,rep});
+  document.getElementById("al").value="";document.getElementById("at").value="";
+  renderAll();save();
+}
+function delAlarm(id){D.alarms=D.alarms.filter(a=>a.id!==id);renderAll();save();}
+function togAlarm(id){const a=D.alarms.find(x=>x.id===id);if(a){a.active=!a.active;a.fired=false;}renderAll();save();}
+
+function addEvent(){
+  const t=document.getElementById("et").value.trim(),tm=document.getElementById("etm").value;
+  const d=document.getElementById("ed").value,loc=document.getElementById("eloc").value.trim();
+  if(!t||!tm)return;
+  D.events.push({id:Date.now(),title:t,time:tm,date:d,color:EVCOL[Math.floor(Math.random()*EVCOL.length)],loc});
+  document.getElementById("et").value="";document.getElementById("etm").value="";
+  document.getElementById("ed").value="";document.getElementById("eloc").value="";
+  renderAll();save();
+}
+function delEvent(id){D.events=D.events.filter(e=>e.id!==id);renderAll();save();}
+
+function addTodo(){
+  const t=document.getElementById("tdi").value.trim();if(!t)return;
+  D.todos.push({id:Date.now(),text:t,done:false});
+  document.getElementById("tdi").value="";renderTodos();save();
+}
+function delTodo(id){D.todos=D.todos.filter(t=>t.id!==id);renderTodos();save();}
+function togTodo(id){const t=D.todos.find(x=>x.id===id);if(t)t.done=!t.done;renderTodos();save();}
+
+// ═══════════════════════════════════
+// SPEECH
+// ═══════════════════════════════════
+let voices=[];
+speechSynthesis.onvoiceschanged=()=>{voices=speechSynthesis.getVoices();};
+function spk(txt){
+  if(!window.speechSynthesis)return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(txt);
+  u.lang="sr-RS";u.rate=0.93;u.pitch=1.1;u.volume=1;
+  const v=voices.find(x=>x.lang.startsWith("sr")||x.lang.startsWith("hr")||x.lang.startsWith("bs")||x.lang.startsWith("sr-Latn"));
+  if(v)u.voice=v;
+  u.onstart=()=>{
+    document.getElementById("ana-status").textContent="🔊 Govori...";
+    document.getElementById("ana-av").classList.add("talking");
+  };
+  u.onend=()=>{
+    document.getElementById("ana-status").textContent="● Dostupna";
+    document.getElementById("ana-av").classList.remove("talking");
+  };
+  speechSynthesis.speak(u);
+}
+
+// ═══════════════════════════════════
+// MICROPHONE
+// ═══════════════════════════════════
+let rec=null,isListening=false;
+function togMic(){
+  if(isListening){rec?.stop();return;}
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){spk("Koristite Chrome za prepoznavanje govora.");return;}
+  rec=new SR();rec.lang="sr-RS";rec.interimResults=false;
+  rec.onstart=()=>{
+    isListening=true;
+    document.getElementById("mic-btn").classList.add("on");
+    document.getElementById("mic-ring").style.display="block";
+    document.getElementById("mic-ico").setAttribute("stroke","#fff");
+    document.getElementById("ana-status").textContent="🎤 Slusa...";
+  };
+  rec.onresult=e=>{
+    const t=e.results[0][0].transcript;
+    document.getElementById("chat-inp").value=t;
+    sendMsg(t);
+    document.getElementById("chat-inp").value="";
+  };
+  rec.onerror=()=>{stopMic();};
+  rec.onend=()=>{stopMic();};
+  rec.start();
+}
+function stopMic(){
+  isListening=false;
+  document.getElementById("mic-btn").classList.remove("on");
+  document.getElementById("mic-ring").style.display="none";
+  document.getElementById("mic-ico").setAttribute("stroke","var(--ac)");
+  document.getElementById("ana-status").textContent="● Dostupna";
+}
+
+// ═══════════════════════════════════
+// SEND MESSAGE TO ANA
+// ═══════════════════════════════════
+async function sendMsg(txt){
+  if(!txt||!txt.trim())return;
+  document.getElementById("chat-inp").value="";
+
+  D.chat.push({r:"u",t:txt});
+  renderChat();
+
+  // Show thinking
+  setThinking(true);
+
+  // Context
+  const n=new Date();
+  const ctx=`PODACI KORISNIKA:
+Alarmi: ${D.alarms.map(a=>a.label+" u "+a.time).join(", ")||"nema"}
+Beleske: ${D.notes.map(n=>n.title).join(", ")||"nema"}
+Termini: ${D.events.map(e=>e.title+" u "+e.time).join(", ")||"nema"}
+Zadaci (aktivni): ${D.todos.filter(t=>!t.done).map(t=>t.text).join(", ")||"nema"}
+Vreme: ${String(n.getHours()).padStart(2,"0")}:${String(n.getMinutes()).padStart(2,"0")}
+Datum: ${n.toLocaleDateString("sr-RS",{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
+
+Korisnik kaze: ${txt}`;
+
+  const newMsg={role:"user",content:ctx};
+  D.apiMsgs=[...D.apiMsgs.slice(-8),newMsg];
+
+  const timeout=setTimeout(()=>{
+    setThinking(false);
+    const er="Veza je spora. Pokusaj ponovo.";
+    D.chat.push({r:"a",t:er});
+    renderChat();spk(er);
+  },18000);
+
+  try{
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:500,
+        system:SYSTEM,
+        messages:D.apiMsgs,
+      })
+    });
+    clearTimeout(timeout);
+    const data=await res.json();
+    const raw=data.content?.[0]?.text||"Nisam razumela. Mozete ponoviti?";
+    const clean=parseCommands(raw);
+    D.apiMsgs=[...D.apiMsgs,{role:"assistant",content:clean}];
+    setThinking(false);
+    D.chat.push({r:"a",t:clean});
+    renderAll();save();
+    spk(clean);
+  }catch(e){
+    clearTimeout(timeout);
+    setThinking(false);
+    const er=navigator.onLine?"Greska u komunikaciji.":"Nema interneta.";
+    D.chat.push({r:"a",t:er});
+    renderChat();spk(er);
+  }
+}
+
+function setThinking(on){
+  const el=document.getElementById("chat-box");if(!el)return;
+  const ex=el.querySelector(".thinking-row");
+  if(on&&!ex){
+    const d=document.createElement("div");
+    d.className="msg-row a thinking-row";
+    d.innerHTML='<div class="av-sm">&#x1F469;&#x200D;&#x1F4BC;</div><div class="i dots-wrap"><div class="dot-ani"></div><div class="dot-ani"></div><div class="dot-ani"></div></div>';
+    el.appendChild(d);el.scrollTop=el.scrollHeight;
+    document.getElementById("ana-status").textContent="&#x1F4AD; Razmislja...";
+  } else if(!on&&ex){
+    ex.remove();
+    document.getElementById("ana-status").textContent="&#x25CF; Dostupna";
+  }
+}
+
+// ═══════════════════════════════════
+// PARSE COMMANDS
+// ═══════════════════════════════════
+function parseCommands(text){
+  const re=/\[CMD:(\w+):(\{.*?\})\]/g;
+  let m,clean=text;
+  while((m=re.exec(text))!==null){
+    const cmd=m[1];
+    let d;
+    try{d=JSON.parse(m[2]);}catch{continue;}
+    clean=clean.replace(m[0],"");
+    if(cmd==="ADD_ALARM")
+      D.alarms.push({id:Date.now(),label:d.label||"Alarm",time:d.time||"08:00",active:true,fired:false,rep:d.rep||"none"});
+    else if(cmd==="ADD_NOTE")
+      D.notes.push({id:Date.now(),title:d.title||"Beleska",items:d.items||[]});
+    else if(cmd==="ADD_EVENT")
+      D.events.push({id:Date.now(),title:d.title||"Termin",time:d.time||"12:00",date:d.date||"",color:EVCOL[Math.floor(Math.random()*EVCOL.length)],loc:d.loc||""});
+    else if(cmd==="ADD_TODO")
+      D.todos.push({id:Date.now(),text:d.text||"Zadatak",done:false});
+    else if(cmd==="DEL_ALARM")
+      D.alarms=D.alarms.filter(a=>a.label!==d.label);
+    else if(cmd==="DEL_TODO")
+      D.todos=D.todos.filter(t=>t.text!==d.text);
+  }
+  return clean.trim();
+}
+
+// ═══════════════════════════════════
+// OFFLINE
+// ═══════════════════════════════════
+window.addEventListener("online",()=>document.getElementById("offbadge").style.display="none");
+window.addEventListener("offline",()=>document.getElementById("offbadge").style.display="block");
+if(!navigator.onLine)document.getElementById("offbadge").style.display="block";
+
+// ═══════════════════════════════════
+// INIT
+// ═══════════════════════════════════
+function init(){
+  setTheme(D.theme||"light");
+  document.documentElement.style.setProperty("--ac",D.ac||"#00c8b4");
+  document.getElementById("uname-lbl").textContent=D.uname||"Sasa";
+  renderAll();
+  swTab("chat");
+}
+init();
+</script>
+</body>
+</html>
